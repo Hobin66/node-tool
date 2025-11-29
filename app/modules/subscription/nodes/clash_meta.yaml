@@ -34,6 +34,10 @@ external-controller-cors:
 
 
 # -------------------- 订阅提供商 --------------------
+#禁止修改    url: "直连节点地址/0.yaml"
+#禁止修改    url: "落地节点地址/1.yaml"
+#此为地址替换识别符号，请勿更改格式
+# —————————
 proxy-providers:
   中转机场:
     type: http
@@ -273,6 +277,9 @@ rule-anchor:
 
 # 部分规则上游为https://github.com/blackmatrix7/ios_rule_script
 # Github Actions 每日自动同步跟随更新
+# 禁止修改    url: "直连规则订阅地址/direct.list"
+# 禁止修改    url: "定义规则订阅地址/customize.list"
+# 此为地址替换识别符号，请勿更改格式
 rule-providers:
   我的直连规则:
     type: http

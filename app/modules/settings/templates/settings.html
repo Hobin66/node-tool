@@ -270,7 +270,8 @@
 
                         <button type="submit" 
                                 form="settingsForm" 
-                                class="btn btn-primary btn-sm">
+                                class="btn btn-primary btn-sm"
+                                onclick="markRestartNeeded()">
                             保存设置
                         </button>
                     </div>
@@ -418,6 +419,10 @@
                 });
             }, 2500); 
         }
+        if (localStorage.getItem('restart_required') === 'true') {
+            showToast('注意：修改参数设置需要重启程序生效', 'error');
+            localStorage.removeItem('restart_required');
+        }
         toggleDbSettings();
     });
 
@@ -543,6 +548,9 @@
             btn.disabled = false;
             btn.innerHTML = originalText;
         });
+    }
+    function markRestartNeeded() {
+        localStorage.setItem('restart_required', 'true');
     }
 </script>
 {% endblock %}
