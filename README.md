@@ -41,7 +41,7 @@
 请复制以下命令，在您的终端中执行。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hobin02130/node-tool/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh https://github.com/hobin02130/node-tool/releases/download/v1.0.0/NodeTool-Linux-amd64.zip
+curl -fsSL https://raw.githubusercontent.com/hobin02130/node-tool/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh https://github.com/hobin02130/node-tool/releases/download/v1.0.1/NodeTool-Linux-amd64.zip
 ```
 
 ### 🖥️ 访问应用
