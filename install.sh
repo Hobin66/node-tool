@@ -86,7 +86,6 @@ function get_latest_release_url() {
         exit 1
     fi
     
-    # 🟢 修复：确保所有提示信息都重定向到标准错误流 (>&2)
     echo -e "${YELLOW}--- 正在从 GitHub Releases 获取最新下载链接 ---${NC}" >&2
     echo -e "✅ 成功获取最新版本链接！" >&2
     echo -e "版本: $(echo "$RELEASE_INFO" | jq -r .tag_name)" >&2
@@ -117,6 +116,7 @@ function core_install_logic() {
     cd "$TEMP_DIR" || return 1
     rm -f package.zip
 
+    # 使用 curl 进行静默、带重试、失败即返回非零的下载
     curl -L --retry 3 --fail -o package.zip "$DOWNLOAD_URL" > /dev/null 2>&1
     
     if [ $? -ne 0 ]; then
@@ -306,11 +306,8 @@ function update() {
     
     echo -e "${CYAN}执行核心更新流程...${NC}"
     
-    # 警告：此命令将执行 install.sh 脚本中的 core_install_logic 函数。
-    # 假设 install.sh 脚本的结构已经被修改为仅执行 core_install_logic 并退出。
-    # 运行 install.sh 脚本 (它现在只执行 core_install_logic)
-    
-    $CMD_PREFIX bash "$INSTALL_SCRIPT"
+    # 运行 install.sh 时传入特殊的更新参数
+    $CMD_PREFIX bash "$INSTALL_SCRIPT" "core-update"
     
     if [ $? -eq 0 ]; then
         echo -e "${YELLOW}重新启动 NodeTool 服务...${NC}"
@@ -422,81 +419,98 @@ NT_SCRIPT_EOF
 
 
 # ---------------------------------------------------------
+# 辅助函数：执行核心安装流程 (包含依赖检查和核心逻辑)
+# ---------------------------------------------------------
+function run_full_install_flow() {
+    echo -e "${YELLOW} 检查系统环境...${NC}"
+    DEPENDENCIES=("unzip" "curl" "wget" "pgrep" "jq" "timeout") 
+    INSTALL_TIMEOUT=120 # 设置超时时间为 60 秒
+
+    for cmd in "${DEPENDENCIES[@]}"; do
+        if ! command -v $cmd &> /dev/null; then
+            echo -e "${YELLOW}未找到 '$cmd'，正在安装...${NC}"
+            INSTALL_SUCCESS=0
+            
+            # 使用临时变量存储安装命令
+            INSTALL_CMD=""
+            
+            if [ -x "$(command -v apt-get)" ]; then
+                # 尝试使用 apt-get 安装。注意：update也需要静默处理。
+                $CMD_PREFIX apt-get update > /dev/null 2>&1
+                INSTALL_CMD="$CMD_PREFIX apt-get install -y $cmd"
+            elif [ -x "$(command -v yum)" ]; then
+                # 尝试使用 yum 安装
+                INSTALL_CMD="$CMD_PREFIX yum install -y $cmd"
+            fi
+            
+            if [ -n "$INSTALL_CMD" ]; then
+                # 设置超时，并将所有输出重定向到 /dev/null
+                if command -v timeout &> /dev/null; then
+                    # 如果系统支持 timeout 命令，则使用它
+                    timeout $INSTALL_TIMEOUT $INSTALL_CMD > /dev/null 2>&1
+                    INSTALL_SUCCESS=$?
+                else
+                    # 如果不支持 timeout，则仅静默安装
+                    $INSTALL_CMD > /dev/null 2>&1
+                    INSTALL_SUCCESS=$?
+                    # 注意：此处无法实现超时退出
+                fi
+            else
+                # 如果没有找到包管理器，直接标记失败
+                INSTALL_SUCCESS=1
+            fi
+            
+            # 检查安装结果
+            if [ $INSTALL_SUCCESS -eq 124 ]; then
+                # 124 是 timeout 命令的退出码，表示命令超时
+                echo -e "${RED}❌ 错误: '$cmd' 安装超时 (${INSTALL_TIMEOUT} 秒)。请检查网络或手动安装。${NC}"
+                exit 1
+            elif [ $INSTALL_SUCCESS -ne 0 ]; then
+                # 检查是否有权限执行 sudo
+                if [ -n "$CMD_PREFIX" ] && [ "$EUID" -ne 0 ]; then
+                    echo -e "${RED}错误: 无法自动安装 '$cmd' (退出码: $INSTALL_SUCCESS)。请确认您具有正确的 sudo 权限。${NC}"
+                else
+                    echo -e "${RED}❌ 错误: 无法自动安装 '$cmd' (退出码: $INSTALL_SUCCESS)。请手动运行相应的安装命令。${NC}"
+                fi
+                exit 1
+            fi
+            
+            echo -e "✅ '$cmd' 安装成功。"
+        fi
+    done
+    
+    # 2. 统一执行核心安装逻辑 (下载、解压、替换)
+    echo -e "${YELLOW} 正在安装...${NC}"
+    core_install_logic
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}安装失败，退出。${NC}"
+        exit 1
+    fi
+}
+
+
+# ---------------------------------------------------------
 # 主脚本开始
 # ---------------------------------------------------------
 
 # 调用架构识别函数
 set_architecture_vars
 
+# 检查命令行参数是否为更新模式
+if [ "$1" == "core-update" ]; then
+    echo -e "${YELLOW}识别到更新模式，跳过卸载检查...${NC}"
+    run_full_install_flow
+    
+    # 在更新模式下，只需执行核心逻辑并退出，nt 脚本会负责重启
+    exit 0
+fi
+
+# 正常安装模式：
 # 检查并卸载旧版本
 check_and_uninstall_if_exists
 
-# 1. 检查依赖
-echo -e "${YELLOW} 检查系统环境...${NC}"
-DEPENDENCIES=("unzip" "curl" "wget" "pgrep" "jq" "timeout") # 🟢 添加 timeout
-INSTALL_TIMEOUT=120 # 设置超时时间为 60 秒
-
-for cmd in "${DEPENDENCIES[@]}"; do
-    if ! command -v $cmd &> /dev/null; then
-        echo -e "${YELLOW}未找到 '$cmd'，正在安装...${NC}"
-        INSTALL_SUCCESS=0
-        
-        # 使用临时变量存储安装命令
-        INSTALL_CMD=""
-        
-        if [ -x "$(command -v apt-get)" ]; then
-            # 尝试使用 apt-get 安装。注意：update也需要静默处理。
-            $CMD_PREFIX apt-get update > /dev/null 2>&1
-            INSTALL_CMD="$CMD_PREFIX apt-get install -y $cmd"
-        elif [ -x "$(command -v yum)" ]; then
-            # 尝试使用 yum 安装
-            INSTALL_CMD="$CMD_PREFIX yum install -y $cmd"
-        fi
-        
-        if [ -n "$INSTALL_CMD" ]; then
-            # 设置超时，并将所有输出重定向到 /dev/null
-            if command -v timeout &> /dev/null; then
-                # 如果系统支持 timeout 命令，则使用它
-                timeout $INSTALL_TIMEOUT $INSTALL_CMD > /dev/null 2>&1
-                INSTALL_SUCCESS=$?
-            else
-                # 如果不支持 timeout，则仅静默安装
-                $INSTALL_CMD > /dev/null 2>&1
-                INSTALL_SUCCESS=$?
-                # 注意：此处无法实现超时退出
-            fi
-        else
-            # 如果没有找到包管理器，直接标记失败
-            INSTALL_SUCCESS=1
-        fi
-        
-        # 检查安装结果
-        if [ $INSTALL_SUCCESS -eq 124 ]; then
-            # 124 是 timeout 命令的退出码，表示命令超时
-            echo -e "${RED}❌ 错误: '$cmd' 安装超时 (${INSTALL_TIMEOUT} 秒)。请检查网络或手动安装。${NC}"
-            exit 1
-        elif [ $INSTALL_SUCCESS -ne 0 ]; then
-            # 检查是否有权限执行 sudo
-            if [ -n "$CMD_PREFIX" ] && [ "$EUID" -ne 0 ]; then
-                echo -e "${RED}错误: 无法自动安装 '$cmd' (退出码: $INSTALL_SUCCESS)。请确认您具有正确的 sudo 权限。${NC}"
-            else
-                echo -e "${RED}❌ 错误: 无法自动安装 '$cmd' (退出码: $INSTALL_SUCCESS)。请手动运行相应的安装命令。${NC}"
-            fi
-            exit 1
-        fi
-        
-        echo -e "✅ '$cmd' 安装成功。"
-    fi
-done
-
-# 2. 统一执行核心安装逻辑 (下载、解压、替换)
-echo -e "${YELLOW} 正在安装...${NC}"
-# 注意：首次安装时，目标目录可能不存在，core_install_logic会负责创建
-core_install_logic
-if [ $? -ne 0 ]; then
-    echo -e "${RED}安装失败，退出。${NC}"
-    exit 1
-fi
+# 执行完整的安装流程 (依赖检查、核心安装)
+run_full_install_flow
 
 # 5. 配置 Systemd 和控制脚本
 echo -e "${YELLOW} 正在设置自启与控制脚本...${NC}"
