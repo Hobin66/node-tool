@@ -4,11 +4,12 @@ import subprocess
 import sys
 import platform
 import zipfile
+import glob  # 🟢 [新增] 用于搜索文件
 
 # ---------------------------------------------------------
 # Configuration Area
 # ---------------------------------------------------------
-PROJECT_NAME = "NodeTool"  # Generated exe/binary name
+PROJECT_NAME = "NodeTool"  # Generated exe/binary name (used for zip filename)
 SPEC_FILE = "node_tool.spec"  # PyInstaller spec file
 DIST_DIR = "dist"
 BUILD_DIR = "build"
@@ -54,20 +55,37 @@ def organize_release():
     if not os.path.exists(RELEASE_DIR):
         os.makedirs(RELEASE_DIR)
 
-    # 1. Determine the executable name
+    # 1. Determine the executable name automatically
+    # 🟢 [修改] 自动探测 dist 目录下的可执行文件，防止名字不匹配
     system_name = platform.system()
-    exe_name = f"{PROJECT_NAME}.exe" if system_name == "Windows" else PROJECT_NAME
     
-    src_exe = os.path.join(DIST_DIR, exe_name)
-    dst_exe = os.path.join(RELEASE_DIR, exe_name)
+    found_exe = None
+    if system_name == "Windows":
+        # 在 Windows 上找 .exe 文件
+        exe_files = glob.glob(os.path.join(DIST_DIR, "*.exe"))
+        if exe_files:
+            found_exe = exe_files[0] # 取第一个找到的 exe
+    else:
+        # 在 Linux/Mac 上，通常是没有后缀的二进制文件
+        # 我们查找 dist 下的所有文件，排除掉文件夹
+        potential_files = [f for f in os.listdir(DIST_DIR) if os.path.isfile(os.path.join(DIST_DIR, f))]
+        if potential_files:
+            found_exe = os.path.join(DIST_DIR, potential_files[0])
 
-    if not os.path.exists(src_exe):
-        print(f"[Error] Error: Generated file not found in dist: {src_exe}")
+    if not found_exe or not os.path.exists(found_exe):
+        print(f"[Error] Error: No executable file found in {DIST_DIR}")
+        # 列出 dist 目录内容方便调试
+        if os.path.exists(DIST_DIR):
+            print(f"Content of {DIST_DIR}: {os.listdir(DIST_DIR)}")
         sys.exit(1)
+        
+    exe_filename = os.path.basename(found_exe)
+    print(f"   -> Found generated executable: {exe_filename}")
 
     # 2. Move executable
-    shutil.copy2(src_exe, dst_exe)
-    print(f"   -> Copied executable: {exe_name}")
+    dst_exe = os.path.join(RELEASE_DIR, exe_filename)
+    shutil.copy2(found_exe, dst_exe)
+    print(f"   -> Copied executable to release folder")
 
     # 3. Copy external assets (nodes folder, etc.)
     for src, dst_folder in EXTERNAL_ASSETS:
