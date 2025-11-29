@@ -23,12 +23,18 @@ NAT小鸡推荐！！！**[独角鲸NAT](https://fuckip.me)** 价格亲民的高
 
 ### 🚀 linux自动化安装
 
-请复制以下命令，在您的终端中执行。
+amd架构
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hobin02130/node-tool/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh https://github.com/hobin02130/node-tool/releases/download/v1.0.1/NodeTool-Linux-amd64.zip
 ```
 ---
+
+arm架构
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hobin02130/node-tool/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh https://github.com/hobin02130/node-tool/releases/download/v1.0.1/NodeTool-Linux-arm64.zip
+```
 
 ### 🖥️ 访问应用
 
