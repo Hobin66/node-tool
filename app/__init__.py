@@ -66,7 +66,7 @@ def create_app(config_class=Config):
     # 5. 初始化并启动调度器
     scheduler.init_app(app)
     
-    # 🚨 [关键修复] 将 app 实例显式绑定到 scheduler 对象上
+    # 将 app 实例显式绑定到 scheduler 对象上
     # 这样在 komari_api.py 中可以通过 scheduler.app 访问上下文，
     # 而不需要将 app 对象作为参数传递（避免了 PostgreSQL 序列化报错）。
     scheduler.app = app 
@@ -84,7 +84,7 @@ def create_app(config_class=Config):
                 minutes=snapshot_interval,
                 max_instances=1,
                 replace_existing=True, 
-                # 🚨 [关键修复] 清空 args，绝对不能传递 app 对象
+                # 清空 args，绝对不能传递 app 对象
                 args=[] 
             )
             print(f">>> [Scheduler] 快照同步任务已启动 (每 {snapshot_interval} 分钟)")
@@ -98,7 +98,7 @@ def create_app(config_class=Config):
                 minutes=static_sync_interval,
                 max_instances=1,
                 replace_existing=True,
-                # 🚨 [关键修复] 清空 args
+                # 清空 args
                 args=[] 
             )
             print(f">>> [Scheduler] 静态信息同步任务已启动 (每 {static_sync_interval} 分钟)")
