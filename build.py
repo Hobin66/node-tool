@@ -9,19 +9,16 @@ import glob
 # ---------------------------------------------------------
 # Configuration Area
 # ---------------------------------------------------------
-PROJECT_NAME = "NodeTool"  # Generated exe/binary name (used for zip filename)
-SPEC_FILE = "node_tool.spec"  # PyInstaller spec file
+PROJECT_NAME = "NodeTool"
+SPEC_FILE = "node_tool.spec"
 DIST_DIR = "dist"
 BUILD_DIR = "build"
-RELEASE_DIR = "release"  # Final release directory
+RELEASE_DIR = "release"
 
-# External assets to copy to the release directory
-# Format: (Source Path, Destination Folder Name)
 EXTERNAL_ASSETS = [
-    # (Source, Destination: empty string means root)
-    ("app/subscription/nodes", "nodes"),  # Copy nodes folder
-    ("db_config.json", ""),      # Copy db config if exists
-    ("app.db", ""),              # Copy database if exists (optional)
+    ("app/subscription/nodes", "nodes"),
+    ("db_config.json", ""),
+    ("app.db", ""),
 ]
 
 def clean_dirs():
@@ -35,29 +32,23 @@ def run_pyinstaller():
     """Run PyInstaller"""
     print(f"[Build] Starting PyInstaller build ({platform.system()})...", flush=True)
     
-    # Check if spec file exists
     if not os.path.exists(SPEC_FILE):
-        print(f"[Error] Error: {SPEC_FILE} not found. Please generate the spec file first.", flush=True)
+        print(f"[Error] Error: {SPEC_FILE} not found.", flush=True)
         sys.exit(1)
 
-    # 🟢 [修改] 自动修改 .spec 文件以禁用 UPX
-    # 因为不能在命令行传 --noupx，我们直接修改文件内容
+    # 自动修改 .spec 文件以禁用 UPX
     try:
         with open(SPEC_FILE, 'r', encoding='utf-8') as f:
             content = f.read()
-        
-        # 如果发现开启了 UPX，就把它关掉
         if "upx=True" in content:
-            print("[Config] Disabling UPX in spec file to avoid antivirus false positives...", flush=True)
+            print("[Config] Disabling UPX in spec file...", flush=True)
             content = content.replace("upx=True", "upx=False")
             with open(SPEC_FILE, 'w', encoding='utf-8') as f:
                 f.write(content)
     except Exception as e:
         print(f"[Warning] Failed to edit spec file: {e}", flush=True)
 
-    # Run PyInstaller command
     try:
-        # 🟢 [修改] 移除了 --noupx 参数，因为我们已经修改了 spec 文件
         subprocess.check_call([sys.executable, "-m", "PyInstaller", SPEC_FILE, "--clean", "-y"])
         print("[Success] PyInstaller build completed", flush=True)
     except subprocess.CalledProcessError:
@@ -65,83 +56,48 @@ def run_pyinstaller():
         sys.exit(1)
 
 def organize_release():
-    """Organize release folder: copy exe and external assets"""
+    """Organize release folder"""
     print(f"[Organize] Organizing release files to '{RELEASE_DIR}'...", flush=True)
     
     if not os.path.exists(RELEASE_DIR):
         os.makedirs(RELEASE_DIR)
 
-    # 1. Determine the executable name automatically
     system_name = platform.system()
-    
     found_exe = None
     if system_name == "Windows":
-        # 在 Windows 上找 .exe 文件
         exe_files = glob.glob(os.path.join(DIST_DIR, "*.exe"))
-        if exe_files:
-            found_exe = exe_files[0] # 取第一个找到的 exe
+        if exe_files: found_exe = exe_files[0]
     else:
-        # 在 Linux/Mac 上，通常是没有后缀的二进制文件
-        # 我们查找 dist 下的所有文件，排除掉文件夹
         potential_files = [f for f in os.listdir(DIST_DIR) if os.path.isfile(os.path.join(DIST_DIR, f))]
-        if potential_files:
-            found_exe = os.path.join(DIST_DIR, potential_files[0])
+        if potential_files: found_exe = os.path.join(DIST_DIR, potential_files[0])
 
     if not found_exe or not os.path.exists(found_exe):
-        print(f"[Error] Error: No executable file found in {DIST_DIR}", flush=True)
-        # 列出 dist 目录内容方便调试
-        if os.path.exists(DIST_DIR):
-            print(f"Content of {DIST_DIR}: {os.listdir(DIST_DIR)}", flush=True)
+        print(f"[Error] No executable file found in {DIST_DIR}", flush=True)
+        if os.path.exists(DIST_DIR): print(f"Content: {os.listdir(DIST_DIR)}", flush=True)
         sys.exit(1)
         
     exe_filename = os.path.basename(found_exe)
-    print(f"   -> Found generated executable: {exe_filename}", flush=True)
-
-    # 2. Move executable
     dst_exe = os.path.join(RELEASE_DIR, exe_filename)
     shutil.copy2(found_exe, dst_exe)
-    print(f"   -> Copied executable to release folder", flush=True)
 
-    # 3. Copy external assets (nodes folder, etc.)
     for src, dst_folder in EXTERNAL_ASSETS:
-        # Check if source exists
         if not os.path.exists(src):
-            print(f"   [Warning] Warning: Asset not found, skipping: {src}", flush=True)
+            print(f"   [Warning] Asset not found: {src}", flush=True)
             continue
-
         final_dst = os.path.join(RELEASE_DIR, dst_folder)
-        
         if os.path.isdir(src):
-            # If it's a directory
-            if os.path.exists(final_dst):
-                shutil.rmtree(final_dst)
+            if os.path.exists(final_dst): shutil.rmtree(final_dst)
             shutil.copytree(src, final_dst)
-            print(f"   -> Copied folder: {src} -> {dst_folder}/", flush=True)
         else:
-            # If it's a file
             shutil.copy2(src, final_dst)
-            print(f"   -> Copied file: {src}", flush=True)
 
-    # 4. Set execution permissions for Linux
     if system_name != "Windows":
         os.chmod(dst_exe, 0o755)
-
-def make_archive():
-    """Create archive for release"""
-    print("[Compress] Creating archive...", flush=True)
     
-    # Architecture name (e.g., amd64, arm64, win32)
-    arch = platform.machine().lower()
-    os_name = platform.system().lower()
-    zip_name = f"{PROJECT_NAME}_{os_name}_{arch}.zip"
-    
-    # Change directory to make the archive path clean
-    shutil.make_archive(os.path.join(".", zip_name.replace('.zip', '')), 'zip', RELEASE_DIR)
-    
-    print(f"[Done] Build successful! File located at: {os.path.abspath(zip_name)}", flush=True)
+    print(f"[Done] Release files organized in '{RELEASE_DIR}' folder.", flush=True)
 
 if __name__ == "__main__":
     clean_dirs()
     run_pyinstaller()
     organize_release()
-    make_archive()
+    # make_archive()  <-- 不再在 Python 里压缩，交给 GitHub Actions
