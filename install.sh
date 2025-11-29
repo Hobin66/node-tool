@@ -72,7 +72,7 @@ function get_latest_release_url() {
     
     # 检查 API 请求是否成功
     if echo "$RELEASE_INFO" | grep -q "Not Found"; then
-        echo -e "${RED}错误: GitHub 仓库 $REPO_OWNER/$REPO_NAME 未找到或无任何 Release。${NC}"
+        echo -e "${RED}错误: GitHub 仓库 $REPO_OWNER/$REPO_NAME 未找到或无任何 Release。${NC}" >&2
         exit 1
     fi
     
@@ -81,16 +81,18 @@ function get_latest_release_url() {
 
     if [ -z "$LATEST_URL" ] || [ "$LATEST_URL" == "null" ]; then
         # 提示用户具体缺失的是哪个架构包
-        echo -e "${RED}错误: 未能在最新 Release 中找到名为 '$ASSET_NAME' 的附件 (对应的架构是 $TOOL_ARCH)。${NC}"
-        echo "请检查 Release 中是否存在该架构的压缩包。"
+        echo -e "${RED}错误: 未能在最新 Release 中找到名为 '$ASSET_NAME' 的附件 (对应的架构是 $TOOL_ARCH)。${NC}" >&2
+        echo "请检查 Release 中是否存在该架构的压缩包。" >&2
         exit 1
     fi
     
-    # 添加输出链接，并添加用户反馈
-    echo -e "${YELLOW}--- 正在从 GitHub Releases 获取最新下载链接 ---${NC}"
-    echo -e "✅ 成功获取最新版本链接！"
-    echo -e "版本: $(echo "$RELEASE_INFO" | jq -r .tag_name)"
+    # 🟢 修复：确保所有提示信息都重定向到标准错误流 (>&2)
+    echo -e "${YELLOW}--- 正在从 GitHub Releases 获取最新下载链接 ---${NC}" >&2
+    echo -e "✅ 成功获取最新版本链接！" >&2
+    echo -e "版本: $(echo "$RELEASE_INFO" | jq -r .tag_name)" >&2
     echo -e "下载链接: ${CYAN}$LATEST_URL${NC}" >&2
+    
+    # 确保只有 LATEST_URL 通过标准输出返回，供 DOWNLOAD_URL 捕获
     echo "$LATEST_URL"
 }
 
