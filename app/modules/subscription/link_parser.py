@@ -345,6 +345,7 @@ def _parse_trojan(parsed, params, proxy_name):
 def _parse_tuic(parsed, params, proxy_name):
     """
     处理 TUIC 协议
+    修复：统一 alpn 逻辑，解决 NameError 和冗余代码。
     """
     userinfo_str, server, port = parse_netloc_manual(parsed.netloc, 443)
     
@@ -358,11 +359,18 @@ def _parse_tuic(parsed, params, proxy_name):
         else:
             uuid_str = urllib.parse.unquote(userinfo_str)
     if not password: password = parsed.password
+    
     skip_cert_verify_value = _get_bool(
-    params, 
-    keys=['insecure', 'skip-cert-verify', 'allowInsecure'], 
-    default=True # TUIC 默认跳过证书验证
-)
+        params, 
+        keys=['insecure', 'skip-cert-verify', 'allowInsecure'], 
+        default=True # TUIC 默认跳过证书验证
+    )
+    
+    alpn_list = _get_list(params, 'alpn')
+    if not alpn_list:
+        alpn_list = ['h3']
+
+    alpn_value_as_string = str(alpn_list).replace("'", '"')
 
     proxy = {
         "name": proxy_name,
@@ -378,12 +386,10 @@ def _parse_tuic(parsed, params, proxy_name):
         "congestion-controller": _get_param(params, 'congestion_controller', 'bbr'),
         "udp-relay-mode": _get_param(params, 'udp-relay-mode', 'native'),
         "reduce-rtt": _get_bool(params, 'reduce-rtt'),
-        "zero-rtt": _get_bool(params, 'zero-rtt')
+        "zero-rtt": _get_bool(params, 'zero-rtt'),
+        "alpn": alpn_value_as_string
     }
     
-    alpn = _get_list(params, 'alpn')
-    if alpn: proxy['alpn'] = alpn
-    else: proxy['alpn'] = ['h3']
     sni_value = _get_param(params, 'sni')
     if sni_value:
         proxy['sni'] = sni_value
