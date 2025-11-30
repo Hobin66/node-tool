@@ -379,9 +379,10 @@ def _parse_tuic(parsed, params, proxy_name):
     alpn = _get_list(params, 'alpn')
     if alpn: proxy['alpn'] = alpn
     else: proxy['alpn'] = ['h3']
-
-    if _get_param(params, 'sni'):
-        proxy['servername'] = _get_param(params, 'sni')
+    sni_value = _get_param(params, 'sni')
+    if sni_value:
+        proxy['sni'] = sni_value
+        proxy['servername'] = sni_value # 保持兼容性
 
     return proxy
 

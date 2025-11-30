@@ -813,12 +813,19 @@ def update_nodes_routing_api():
 def download_v2ray_base64():
     """下载 Base64 订阅"""
     verify_request_token()
-    # 统一从 merged 列表获取，确保顺序正确
-    nodes = merge_db_to_local_json()
-    nodes.sort(key=lambda x: x.get('sort_index', 0))
-    
+    # 1. 统一从 merged 列表获取所有节点
+    all_nodes = merge_db_to_local_json()
+    # 2. 【核心修复】筛选只包含 直连(0) 和 落地(1) 的节点
+    # 屏蔽/禁用节点 (routing_type = -1) 将被排除
+    nodes_to_include = [
+        node for node in all_nodes
+        if node.get('routing_type') in [0, 1]
+    ]
+
+    # 3. 按 sort_index 排序
+    nodes_to_include.sort(key=lambda x: x.get('sort_index', 0))
     links = []
-    for node in nodes:
+    for node in nodes_to_include:
         links_dict = node.get('links', {})
         name = node.get('name', 'Unknown')
         origin = node.get('origin', 'local')
