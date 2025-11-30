@@ -9,7 +9,7 @@
 
 NAT小鸡推荐！！！**[独角鲸NAT](https://fuckip.me)** 价格亲民的高性价比VPS服务
 
-7折优惠码：NODETOOL-70
+7折优惠码：`NODETOOL-70`
 
 ---
 
@@ -31,7 +31,7 @@ NAT小鸡推荐！！！**[独角鲸NAT](https://fuckip.me)** 价格亲民的高
 
 ### 🚀 linux自动化安装
 
-支持amd和arm架构，支持docker环境，程序运行目录为/root/nodetool，安装完成后可使用 nt 命令打开快捷面板。
+支持 `amd` 和 `arm` 架构，支持 `docker` 环境，程序运行目录为 `/root/nodetool`，安装完成后可使用 `nt` 命令打开快捷面板。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Hobin66/node-tool/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh
@@ -40,10 +40,15 @@ curl -fsSL https://raw.githubusercontent.com/Hobin66/node-tool/main/install.sh -
 
 ###  🚀 Docker化安装
 
-- 注意不能直接使用   本地文件夹:/app  这种映射方式
+- 注意不能直接使用   `本地文件夹:/app`  这种映射方式
 - 必须一对一映射文件或文件夹
-- 文件：db_config.json app.db
-- 文件夹：nodes 
+- 文件：`db_config.json` ， `app.db`
+- 文件夹：`nodes` 
+
+使用 `docker` 安装必须提前创建好文件或文件夹，可使用下面代码快速创建，将工作在 `/root/nodetool_data`
+```bash 
+mkdir -p /root/nodetool_data/nodes && touch /root/nodetool_data/{db_config.json,app.db}
+```
 
 ```bash
 docker run -d \
