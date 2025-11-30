@@ -1,6 +1,12 @@
 ## 简介
 基于 Flask 的轻量级服务器节点管理工具最小内存占用仅 50mb 可在NAT小鸡部署。
 
+电报讨论群：https://t.me/+x06q8iR0Nlw1MjBl
+
+更新发布频道：https://t.me/+xeAjL2s-0X1jZTM1
+
+---
+
 NAT小鸡推荐！！！**[独角鲸NAT](https://fuckip.me)** 价格亲民的高性价比VPS服务
 
 7折优惠码：NODETOOL-70
