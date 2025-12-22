@@ -154,6 +154,8 @@ def get_db_file_size():
 
 # --- 2. 节点相关操作 ---
 
+# 找到 upsert_node 函数，替换其中的日期处理逻辑
+
 def upsert_node(node_info):
     """[写] 更新或插入节点信息 (通常由 Komari 同步任务调用)"""
     try:
@@ -173,18 +175,32 @@ def upsert_node(node_info):
         node.region = node_info.get('region')
         node.traffic_limit = node_info.get('traffic_limit', 0)
         
+        # ------------------ [CRITICAL FIX START] ------------------
+        # 修复：防止 invalid date (year -1 / year 0) 导致崩溃
         expired_at_str = node_info.get('expired_at')
         if expired_at_str:
             try:
-                # 兼容 ISO 格式的时间字符串
+                # 1. 预处理 ISO 格式
                 if expired_at_str.endswith('Z'):
                     expired_at_str = expired_at_str[:-1]
-                node.expired_at = datetime.fromisoformat(expired_at_str)
-            except ValueError as ve:
-                print(f"Warning: Failed to parse datetime string '{expired_at_str}': {ve}")
+                
+                # 2. 尝试解析
+                dt_obj = datetime.fromisoformat(expired_at_str)
+                
+                # 3. [关键] 安全范围检查
+                # 如果年份小于 2000 (例如 0001-01-01)，视为无效/永不过期
+                if dt_obj.year < 2000:
+                    node.expired_at = None
+                else:
+                    node.expired_at = dt_obj
+                    
+            except (ValueError, OSError) as ve:
+                # 捕获 "year is out of range" 或格式解析错误
+                print(f"Warning: Ignored invalid date '{expired_at_str}' for node {uuid}: {ve}")
                 node.expired_at = None
         else:
             node.expired_at = None
+        # ------------------ [CRITICAL FIX END] ------------------
         
         node.weight = node_info.get('weight')
         
